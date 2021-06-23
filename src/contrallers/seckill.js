@@ -1,10 +1,18 @@
+// 引入相关库
 const moment = require('moment');
+const Op = require('sequelize').Op;
 // 引入数据库model文件
 const seckillModel = require('../../dbs/mysql/models/seckill_goods');
 const ordersModel = require('../../dbs/mysql/models/orders');
+// 引入Redis实例
+const redis = require('../../dbs/redis');
 // 引入工具函数或工具类
 const UserModule = require('../modules/user');
-const { random_String } = require('../../utils/tools/funcs')
+const { randomString, checkObjNull } = require('../../utils/tools/funcs');
+// 引入秒杀key前缀
+const { SECKILL_GOOD } = require('../../utils/constants/redis-prefixs');
+// 引入避免超卖lua脚本
+const { stock } = require('../../utils/scripts');
 
 class Seckill {
   async doSeckill(ctx, next) {
@@ -15,12 +23,9 @@ class Seckill {
     // 基本参数校验
     if (!accessToken || !path) { return ctx.throwException(20001, '参数错误！'); };
     // 判断此产品是否加入了抢购
-    const seckill = await seckillModel.findOne({
-      where: {
-        fk_good_id: ctx.params.good_id,
-      }
-    });
-    if (!seckill) { return ctx.throwException(30002, '该产品并未有抢购活动！'); };
+    const key = `${SECKILL_GOOD}${ctx.params.good_id}`;
+    const seckill = await redis.hgetall(key);
+    if (!checkObjNull(seckill)) { return ctx.throwException(30002, '该产品并未有抢购活动！'); };
     // 判断是否有效
     if (!seckill.is_valid) { return ctx.throwException(30003, '该活动已结束！'); };
     // 判单是否开始、结束
@@ -41,23 +46,24 @@ class Seckill {
     const orderInfo = await ordersModel.findOne({
       where: {
         user_id: userInfo.id,
-        seckill_id: seckill.id,
+        good_id: ctx.params.good_id,
+        status: { [Op.between]: ['0', '1'] },
       },
-    })
+    });
     if (orderInfo) { return ctx.throwException(30007, '该用户已抢到该产品，无需再抢！'); };
 
     // 扣库存
-    const count = await seckill.decrement('amount');
-    if (count.amount <= 0) { return ctx.throwException(30006, '该产品已经卖完了！'); };
+    const count = await redis.eval(stock, 2, [key, 'amount', '', '']);
+    if (count <= 0) { return ctx.throwException(30006, '该产品已经卖完了！'); };
 
     // 下单
     const orderData = {
-      order_no: Date.now() + random_String(4), // 这里就用当前时间戳加4位随机数作为订单号，实际开发中根据业务规划逻辑 
+      order_no: Date.now() + randomString(4), // 这里就用当前时间戳加4位随机数作为订单号，实际开发中根据业务规划逻辑 
       good_id: ctx.params.good_id,
       user_id: userInfo.id,
       status: '1', // -1 已取消, 0 未付款， 1 已付款， 2已退款
       order_type: '2', // 1 常规订单 2 秒杀订单
-      seckill_id: seckill.id, // 秒杀活动id
+      // seckill_id: seckill.id, // 秒杀活动id, redis中不维护秒杀活动id
       comment: '', // 备注
     };
     const order = ordersModel.create(orderData);
@@ -68,7 +74,6 @@ class Seckill {
       path,
       data: '抢购成功!'
     });
-
   }
 
 }

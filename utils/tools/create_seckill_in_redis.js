@@ -1,5 +1,5 @@
 const redis = require('../../dbs/redis');
-const { SECKILL_GOOD } = require('../constants/redis-prefixs')
+const { SECKILL_GOOD } = require('../constants/redis-prefixs');
 
 const run = async function() {
   const data = {
@@ -11,7 +11,11 @@ const run = async function() {
     comment: '...',
   }
 
-  const result = await redis.hmset(`${SECKILL_GOOD}_1`, data);
+  const result = await redis.hmset(`${SECKILL_GOOD}1`, data);
 
   console.log(result);
 }
+
+run().then(() => {
+  process.exit();
+});

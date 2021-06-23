@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "sync": "cross-env NODE_ENV=production node dbs/mysql/sync.js",
     "dsync": "node dbs/mysql/sync.js",
-    "create_token": "node utils/tools/create_token.js "
+    "create_token": "node utils/tools/create_token.js ",
+    "add_seckill": "node utils/tools/create_seckill_in_redis.js "
   },
   "keywords": [],
   "author": "",

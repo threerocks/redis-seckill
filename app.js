@@ -8,6 +8,9 @@ const { throwException } = require('./utils/constants/errors');
 
 const seckillModule = require('./src/contrallers/seckill');
 
+// 预加载脚本文件
+require('./utils/scripts');
+
 const app = new Koa();
 const router = new Router();
 

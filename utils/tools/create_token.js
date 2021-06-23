@@ -21,4 +21,6 @@ const run = async function() {
   console.log('写入文件成功');
 }
 
-run();
+run().then(() => {
+  process.exit();
+});
